@@ -7,7 +7,7 @@ const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 
 // token secreto que só você sabe
-const ADMIN_TOKEN = "SUPERSEGREDO_123456";
+const ADMIN_TOKEN = "labatataH0SCH8DC9DH9C912723QDB@@@362FD1102Y7E0H720H7E02H7EXH027DHY2H0X72E";
 
 io.on("connection", (socket) => {
   console.log("Novo cliente conectado");

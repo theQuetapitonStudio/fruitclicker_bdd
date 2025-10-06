@@ -14,10 +14,10 @@ const ADMINS = [
   }
 ];
 
-// === HISTÓRICO DE MENSAGENS / EVENTOS ===
-const messagesHistory = [];
-const eventsHistory = [];
-const MAX_HISTORY = 50; // limite de histórico
+// === HISTÓRICO ===
+let messagesHistory = [];
+let eventsHistory = [];
+const MAX_HISTORY = 50;
 
 function findAdminByToken(token) {
   return ADMINS.find(a => a.token === token) || null;
@@ -25,11 +25,12 @@ function findAdminByToken(token) {
 
 // === SOCKET.IO ===
 io.on("connection", (socket) => {
+  // envia só mensagens ainda válidas (não expiradas)
+  const now = Date.now();
+  messagesHistory
+    .filter(msg => !msg.expiresAt || msg.expiresAt > now)
+    .forEach(msg => socket.emit("globalMsg", msg.text));
 
-  // envia histórico de mensagens para quem conectar
-  messagesHistory.forEach(msg => socket.emit("globalMsg", msg));
-
-  // envia histórico de eventos para quem conectar
   eventsHistory.forEach(event => socket.emit("globalEvent", event));
 
   socket.on("adminCmd", ({ token, cmd, payload }) => {
@@ -41,9 +42,21 @@ io.on("connection", (socket) => {
 
     // === MENSAGENS GLOBAIS ===
     if (cmd === "msg") {
-      messagesHistory.push(payload);
-      if (messagesHistory.length > MAX_HISTORY) messagesHistory.shift(); // remove mais antigas
+      const duration = 5000; // 5 segundos (ou o mesmo usado no front)
+      const expiresAt = Date.now() + duration;
+
+      const msgObj = { text: payload, expiresAt };
+      messagesHistory.push(msgObj);
+
+      if (messagesHistory.length > MAX_HISTORY) messagesHistory.shift();
+
       io.emit("globalMsg", payload);
+
+      // remove depois do tempo expirar
+      setTimeout(() => {
+        messagesHistory = messagesHistory.filter(m => m !== msgObj);
+      }, duration);
+
       return;
     }
 
@@ -58,10 +71,7 @@ io.on("connection", (socket) => {
       }
       return;
     }
-
-    // outros comandos futuros aqui...
   });
-
 });
 
 const PORT = process.env.PORT || 10000;

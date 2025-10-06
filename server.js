@@ -25,13 +25,17 @@ function findAdminByToken(token) {
 
 // === SOCKET.IO ===
 io.on("connection", (socket) => {
-  // envia só mensagens ainda válidas (não expiradas)
   const now = Date.now();
+
+  // Envia só mensagens ainda válidas
   messagesHistory
     .filter(msg => !msg.expiresAt || msg.expiresAt > now)
     .forEach(msg => socket.emit("globalMsg", msg.text));
 
-  eventsHistory.forEach(event => socket.emit("globalEvent", event));
+  // Envia só eventos ainda válidos
+  eventsHistory
+    .filter(event => !event.expiresAt || event.expiresAt > now)
+    .forEach(event => socket.emit("globalEvent", event.payload));
 
   socket.on("adminCmd", ({ token, cmd, payload }) => {
     const admin = findAdminByToken(token);
@@ -42,17 +46,16 @@ io.on("connection", (socket) => {
 
     // === MENSAGENS GLOBAIS ===
     if (cmd === "msg") {
-      const duration = 5000; // 5 segundos (ou o mesmo usado no front)
+      const duration = 5000; // 5 segundos
       const expiresAt = Date.now() + duration;
 
       const msgObj = { text: payload, expiresAt };
       messagesHistory.push(msgObj);
-
       if (messagesHistory.length > MAX_HISTORY) messagesHistory.shift();
 
       io.emit("globalMsg", payload);
 
-      // remove depois do tempo expirar
+      // Remove depois do tempo
       setTimeout(() => {
         messagesHistory = messagesHistory.filter(m => m !== msgObj);
       }, duration);
@@ -63,9 +66,19 @@ io.on("connection", (socket) => {
     // === EVENTOS GLOBAIS ===
     if (cmd === "event") {
       if (admin.email === "oamost123@gmail.com") {
-        eventsHistory.push(payload);
+        const duration = 5000; // também dura 5 segundos
+        const expiresAt = Date.now() + duration;
+
+        const eventObj = { payload, expiresAt };
+        eventsHistory.push(eventObj);
         if (eventsHistory.length > MAX_HISTORY) eventsHistory.shift();
+
         io.emit("globalEvent", payload);
+
+        // Remove depois do tempo
+        setTimeout(() => {
+          eventsHistory = eventsHistory.filter(e => e !== eventObj);
+        }, duration);
       } else {
         console.log(`adminCmd: ${admin.email} tentou spawnar evento sem permissão`);
       }
